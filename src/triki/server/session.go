@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"triki"
 )
 
 type SessionManager struct {
@@ -25,12 +26,7 @@ const (
 	AVAILABLE = 1
 )
 
-type Player struct {
-	Uname  string
-	Status int
-	Id     string
-	Ip     string
-}
+type Player triki.Player
 
 func (s_mng *SessionManager) SessionStart(player *Player, response *[]Player) error {
 	// lock session for data syncronization problems
@@ -102,7 +98,6 @@ func (p *MemProvider) getAllUsers(response *[]Player) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, v := range p.session_map {
-		fmt.Println(v)
 		if v.player.Status == AVAILABLE {
 			*response = append(*response, v.player)
 		}
