@@ -14,10 +14,9 @@ CLIENT=client
 $(shell cd $(SRC))
 
 all:
+	${GOBUILD} ${TRIKI}
 	${GOBUILD} ${SERVER}.go
 	${GOBUILD} ${CLIENT}.go
-	${GOBUILD} ${TRIKI}
-	${GOBUILD} ${TRIKI}
 
 .PHONY: test open install
 
