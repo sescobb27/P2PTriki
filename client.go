@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -9,7 +10,7 @@ import (
 	"os"
 	"strconv"
 	"time"
-	// "triki"
+	"triki"
 )
 
 func assertNoError(err error) {
@@ -20,7 +21,6 @@ func assertNoError(err error) {
 }
 
 var (
-	me    *Player
 	hasVs = make(chan bool)
 )
 
@@ -29,12 +29,7 @@ const (
 	AVAILABLE = 1
 )
 
-type Player struct {
-	Uname  string
-	Status int
-	Id     string
-	Ip     string
-}
+type Player triki.Player
 
 func encryptId() string {
 	crutime := time.Now().Unix()
@@ -50,36 +45,24 @@ func each(arr []Player, f func(p Player)) {
 	}
 }
 
-func print(p Player) {
-	if p.Uname != me.Uname {
-		fmt.Println("* " + p.Uname)
-	}
-}
-
-func getIpAddress() string {
-	addrs, err := net.InterfaceAddrs()
-	assertNoError(err)
-	for _, a := range addrs {
-		ipnet, ok := a.(*net.IPNet)
-		if ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-			fmt.Println("your ip address is: ", ipnet.IP.String())
-			return ipnet.IP.String()
+func noPrint(me Player) func(p Player) {
+	return func(p Player) {
+		if p.Uname != me.Uname {
+			fmt.Println("* " + p.Uname)
 		}
 	}
-	return ""
 }
 
 func listenConnection(conn net.Conn) {
 	defer conn.Close()
-	fmt.Println(conn)
-	buf := make([]byte, 1024)
-	_, err := conn.Read(buf)
-	assertNoError(err)
-	fmt.Println(string(buf))
+	dec := gob.NewDecoder(conn)
+	board := &triki.Board{}
+	dec.Decode(board)
+	fmt.Print("Error")
+	fmt.Println(board)
 }
 
-func callPlayer(vsPlayer *Player) {
-	// addr := vsPlayer.Ip + ":8080"
+func callPlayer(vsPlayer *Player, me *Player) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":8081")
 	assertNoError(err)
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
@@ -87,7 +70,10 @@ func callPlayer(vsPlayer *Player) {
 	defer conn.Close()
 	err = conn.SetNoDelay(true)
 	assertNoError(err)
-	conn.Write([]byte("Hello\n"))
+	board := triki.NewBoard()
+	fmt.Println(board)
+	enc := gob.NewEncoder(conn)
+	enc.Encode(board)
 }
 
 func startServer() {
@@ -123,10 +109,9 @@ func main() {
 
 	fmt.Print("Username: ")
 	fmt.Scanf("%s", &username)
-	me = &Player{Id: encryptId(),
+	me := &Player{Id: encryptId(),
 		Status: AVAILABLE,
-		Uname:  username,
-		Ip:     getIpAddress()}
+		Uname:  username}
 	var reply []Player
 	for {
 		err = client.Call("SessionManager.SessionStart", me, &reply)
@@ -151,7 +136,7 @@ func main() {
 	}
 	for !found {
 		fmt.Println("Escoger Jugador: ")
-		each(reply, print)
+		each(reply, noPrint(*me))
 		fmt.Scanf("%s", &vs)
 		each(reply, _select)
 		select {
@@ -162,7 +147,9 @@ func main() {
 		}
 	}
 	if found {
-		callPlayer(vsPlayer)
+		vsPlayer.Symbol = triki.X
+		me.Symbol = triki.O
+		callPlayer(vsPlayer, me)
 		// err = client.Call("SessionManager.SelectPlayer", []string{vs, me.Id}, nil)
 		// assertNoError(err)
 	}
