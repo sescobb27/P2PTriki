@@ -13,8 +13,9 @@ const (
 
 type Player struct {
 	Id     string
-	Name   string
+	Uname  string
 	Symbol string
+	Status int
 }
 
 func (p *Player) ask() {
@@ -24,12 +25,5 @@ func (p *Player) ask() {
 	switch response {
 	case "n":
 		os.Exit(0)
-	}
-}
-
-func init() {
-	player := new(Player)
-	for {
-		player.ask()
 	}
 }
