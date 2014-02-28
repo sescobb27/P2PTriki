@@ -16,6 +16,7 @@ type Player struct {
 	Uname  string
 	Symbol string
 	Status int
+	Ip     string
 }
 
 func (p *Player) ask() {
