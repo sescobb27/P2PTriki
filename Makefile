@@ -21,5 +21,4 @@ all:
 .PHONY: test open install
 
 test:
-	${GOTEST} ${TRIKI}/${SERVER}
-	${GOTEST} ${TRIKI}/${CLIENT}
+	${GOTEST} ${TRIKI}
