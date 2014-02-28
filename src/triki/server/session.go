@@ -33,6 +33,7 @@ func (s_mng *SessionManager) SessionStart(player *Player, response *[]Player) er
 	s_mng.lock.Lock()
 	defer s_mng.lock.Unlock()
 	if !s_mng.provider.SessionExist(player.Id) {
+		fmt.Println(player)
 		s_mng.provider.SessionInit(player)
 	}
 
