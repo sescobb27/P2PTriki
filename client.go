@@ -29,8 +29,6 @@ const (
 	AVAILABLE = 1
 )
 
-type Player *triki.Player
-
 func encryptId() string {
 	crutime := time.Now().Unix()
 	hash := sha256.New()
@@ -39,14 +37,14 @@ func encryptId() string {
 	return sid
 }
 
-func each(arr []Player, f func(p Player)) {
+func each(arr []*triki.Player, f func(p *triki.Player)) {
 	for _, p := range arr {
 		f(p)
 	}
 }
 
-func noPrint(me Player) func(p Player) {
-	return func(p Player) {
+func noPrint(me *triki.Player) func(p *triki.Player) {
+	return func(p *triki.Player) {
 		if p.Uname != me.Uname {
 			fmt.Println("* " + p.Uname)
 		}
@@ -60,12 +58,12 @@ func listenConnection(conn net.Conn) *triki.Board {
 	return board
 }
 
-func play(vsPlayer Player, me Player, conn net.Conn, board *triki.Board) {
+func play(me *triki.Player, conn net.Conn, board *triki.Board) bool {
 	if board == nil {
 		board = triki.NewBoard()
 	}
-	enc := gob.NewEncoder(conn)
 	var posx, posy int
+	var enc *gob.Encoder
 	for board.Available > 0 {
 		board.Print()
 		fmt.Println("Posicion de su Jugada: ")
@@ -73,13 +71,20 @@ func play(vsPlayer Player, me Player, conn net.Conn, board *triki.Board) {
 		if err != nil {
 			continue
 		}
-		board.Play(me, float64(posx), float64(posy))
+		board.Play(me, posx, posy)
+		board.Print()
+		if board.CheckWin(me) {
+			fmt.Println("Has Ganado")
+			return true
+		}
+		enc = gob.NewEncoder(conn)
 		enc.Encode(*board)
 		board = listenConnection(conn)
 	}
+	return false
 }
 
-func callPlayer(vsPlayer Player, me Player) {
+func callPlayer(vsPlayer *triki.Player, me *triki.Player) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":8081")
 	assertNoError(err)
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
@@ -92,17 +97,20 @@ func callPlayer(vsPlayer Player, me Player) {
 	enc := gob.NewEncoder(conn)
 	enc.Encode(*me)
 
-	play(vsPlayer, me, conn, nil)
+	won := play(me, conn, nil)
+	if !won {
+		fmt.Println("Has perdido")
+	}
 }
 
-func getVsPlayer(conn net.Conn) Player {
+func getVsPlayer(conn net.Conn) *triki.Player {
 	dec := gob.NewDecoder(conn)
 	vsPlayer := &triki.Player{}
 	dec.Decode(vsPlayer)
 	return vsPlayer
 }
 
-func startServer(quit chan int, me Player) {
+func startServer(quit chan int, me triki.Player) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":8081")
 	assertNoError(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
@@ -115,8 +123,12 @@ func startServer(quit chan int, me Player) {
 			continue
 		}
 		vsPlayer := getVsPlayer(conn)
+		fmt.Println("Incomming connection from" + vsPlayer.Uname)
 		board := listenConnection(conn)
-		play(vsPlayer, me, conn, board)
+		won := play(&me, conn, board)
+		if !won {
+			fmt.Println("Has perdido")
+		}
 		conn.Close()
 		quit <- 1
 	}
@@ -158,8 +170,8 @@ func main() {
 		Uname:  username,
 		Ip:     getIpAddress()}
 
-	var reply []Player
-	go startServer(quit, me)
+	var reply []*triki.Player
+	go startServer(quit, *me)
 	for {
 		err = client.Call("SessionManager.SessionStart", me, &reply)
 		assertNoError(err)
@@ -173,10 +185,10 @@ func main() {
 	}
 
 	var vs string
-	var vsPlayer Player
+	var vsPlayer *triki.Player
 	found := false
 	has_conn := false
-	_select := func(p Player) {
+	_select := func(p *triki.Player) {
 		if vs == p.Uname {
 			vsPlayer = p
 			found = true
@@ -196,12 +208,11 @@ func main() {
 		}
 	}
 	if found {
-		vsPlayer.Symbol = triki.X
 		me.Symbol = triki.O
+		err = client.Call("SessionManager.SelectPlayer", []string{vsPlayer.Id, me.Id}, nil)
+		assertNoError(err)
 		callPlayer(vsPlayer, me)
 		close(quit)
-		// err = client.Call("SessionManager.SelectPlayer", []string{vs, me.Id}, nil)
-		// assertNoError(err)
 	}
 	<-quit
 }
