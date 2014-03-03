@@ -85,13 +85,11 @@ func play(me *triki.Player, conn net.Conn, board *triki.Board) bool {
 }
 
 func callPlayer(vsPlayer *triki.Player, me *triki.Player) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ":8081")
+	tcpAddr, err := net.ResolveTCPAddr("tcp", vsPlayer.Ip+":8081")
 	assertNoError(err)
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	assertNoError(err)
 	defer conn.Close()
-	err = conn.SetNoDelay(true)
-	assertNoError(err)
 
 	// send me for the other player know me
 	enc := gob.NewEncoder(conn)
